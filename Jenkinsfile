@@ -1,14 +1,12 @@
 pipeline {
     agent any
- agent any
     tools {
         nodejs 'nodejs-20.11.0' // Name of the Node.js installation in Jenkins
     }
 
     environment {
-        NODEJS_HOME = 'C:/Program Files/nodejs'  // Set the Node.js path
+        NODEJS_HOME = 'C:/Program Files/nodejs' // Set the Node.js path
         SONAR_SCANNER_PATH = 'C:/Users/ADMIN/Downloads/sonar-scanner-cli-6.2.1.4610-windows-x64/sonar-scanner-6.2.1.4610-windows-x64/bin'
-        SONAR_HOST_URL = 'http://localhost:9000'         // SonarQube server URL
     }
 
     stages {
@@ -21,11 +19,10 @@ pipeline {
         stage('Backend - Install Dependencies') {
             steps {
                 dir('backend') {
-                    script {
-                        def nodejs = tool name: 'NodeJS', type: 'NodeJS'
-                        env.PATH = "${nodejs}/bin:${env.PATH}"
-                    }
-                    sh 'npm install'
+                    bat '''
+                    set PATH=%NODEJS_HOME%;%PATH%
+                    npm install
+                    '''
                 }
             }
         }
@@ -33,11 +30,10 @@ pipeline {
         stage('Frontend - Install Dependencies') {
             steps {
                 dir('frontend') {
-                    script {
-                        def nodejs = tool name: 'NodeJS', type: 'NodeJS'
-                        env.PATH = "${nodejs}/bin:${env.PATH}"
-                    }
-                    sh 'npm install'
+                    bat '''
+                    set PATH=%NODEJS_HOME%;%PATH%
+                    npm install
+                    '''
                 }
             }
         }
@@ -45,7 +41,10 @@ pipeline {
         stage('Backend - Lint') {
             steps {
                 dir('backend') {
-                    sh 'npm run lint'
+                    bat '''
+                    set PATH=%NODEJS_HOME%;%PATH%
+                    npm run lint
+                    '''
                 }
             }
         }
@@ -53,40 +52,48 @@ pipeline {
         stage('Frontend - Lint') {
             steps {
                 dir('frontend') {
-                    sh 'npm run lint'
+                    bat '''
+                    set PATH=%NODEJS_HOME%;%PATH%
+                    npm run lint
+                    '''
                 }
             }
         }
 
-        stage('Build Frontend') {
+        stage('Frontend - Build') {
             steps {
                 dir('frontend') {
-                    sh 'npm run build'
+                    bat '''
+                    set PATH=%NODEJS_HOME%;%PATH%
+                    npm run build
+                    '''
                 }
             }
         }
 
         stage('SonarQube Analysis') {
+            environment {
+                SONAR_TOKEN = credentials('Sonarqube-token') // Accessing the SonarQube token stored in Jenkins credentials
+            }
             steps {
-                script {
-                    def scannerHome = tool name: 'SonarQubeScanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
-                    withSonarQubeEnv('SonarQube') {
-                        sh """
-                        ${scannerHome}/bin/sonar-scanner \
-                        -Dsonar.projectKey=mern-app \
-                        -Dsonar.sources=. \
-                        -Dsonar.host.url=${SONAR_HOST_URL} \
-                        -Dsonar.login=${SONAR_TOKEN}
-                        """
-                    }
-                }
+                bat '''
+                set PATH=%SONAR_SCANNER_PATH%;%PATH%
+                where sonar-scanner || echo "SonarQube scanner not found. Please install it."
+                sonar-scanner -Dsonar.projectKey=mern-app ^
+                    -Dsonar.sources=. ^
+                    -Dsonar.host.url=http://localhost:9000 ^
+                    -Dsonar.token=%SONAR_TOKEN% 2>&1
+                '''
             }
         }
 
-        stage('Deploy Backend') {
+        stage('Backend - Deploy') {
             steps {
                 dir('backend') {
-                    sh 'npm start'
+                    bat '''
+                    set PATH=%NODEJS_HOME%;%PATH%
+                    npm start
+                    '''
                 }
             }
         }
